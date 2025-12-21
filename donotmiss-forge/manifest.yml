@@ -1,0 +1,23 @@
+modules:
+  jira:projectPage:
+    - key: donotmiss-dashboard
+      title: DoNotMiss
+      resource: main
+      resolver:
+        function: resolver
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: static/dashboard/build
+app:
+  runtime:
+    name: nodejs20.x
+  id: ari:cloud:ecosystem::app/c64bd487-9dc2-47bb-8777-dd2fbd96410e
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - storage:app
