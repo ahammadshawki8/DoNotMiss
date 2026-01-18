@@ -9,6 +9,8 @@ function App() {
   const [users, setUsers] = useState([]);
   const [actionLoading, setActionLoading] = useState({});
   const [showAssignModal, setShowAssignModal] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
 
   useEffect(() => {
     loadTasks();
@@ -55,11 +57,34 @@ function App() {
     }
   };
 
+  // Sync tasks from Flask backend
+  const handleSyncFromBackend = async () => {
+    setSyncing(true);
+    setSyncStatus(null);
+    try {
+      const result = await invoke('syncFromBackend');
+      if (result.success) {
+        setSyncStatus({ type: 'success', message: `Synced! Added ${result.added} new task(s).` });
+        await refreshTasks();
+      } else {
+        setSyncStatus({ type: 'error', message: result.error || 'Sync failed' });
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      setSyncStatus({ type: 'error', message: 'Could not connect to backend' });
+    }
+    setSyncing(false);
+    // Clear status after 3 seconds
+    setTimeout(() => setSyncStatus(null), 3000);
+  };
+
   const handleSendToJira = async (taskId, assigneeId = null) => {
     setActionLoading(prev => ({ ...prev, [taskId]: 'sending' }));
     try {
       const result = await invoke('sendToJira', { taskId, assigneeId });
       if (result.success) {
+        // Also mark as sent on Flask backend (fire and forget)
+        invoke('markSentOnBackend', { taskId }).catch(() => {});
         refreshTasks();
       } else {
         alert('Failed: ' + (result.error || 'Unknown error'));
@@ -75,6 +100,8 @@ function App() {
     setActionLoading(prev => ({ ...prev, [taskId]: 'declining' }));
     try {
       await invoke('declineTask', { taskId });
+      // Also delete from Flask backend (fire and forget)
+      invoke('deleteFromBackend', { taskId }).catch(() => {});
       refreshTasks();
     } catch (error) {
       console.error('Failed to decline task:', error);
@@ -166,9 +193,23 @@ function App() {
             <div className="stat"><span className="stat-value">{pendingCount}</span><span className="stat-label">Inbox</span></div>
             <div className="stat stat-done"><span className="stat-value">{sentCount}</span><span className="stat-label">Sent</span></div>
           </div>
+          <button 
+            className={`btn btn-sync ${syncing ? 'syncing' : ''}`} 
+            onClick={handleSyncFromBackend} 
+            disabled={syncing}
+            title="Sync tasks from Flask backend"
+          >
+            {syncing ? '🔄' : '⬇️'} Sync
+          </button>
           <button className="btn btn-text" onClick={handleClearAll} title="Clear all tasks">🗑️</button>
         </div>
       </header>
+
+      {syncStatus && (
+        <div className={`sync-status ${syncStatus.type}`}>
+          {syncStatus.type === 'success' ? '✅' : '❌'} {syncStatus.message}
+        </div>
+      )}
 
       <div className="filters">
         <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>

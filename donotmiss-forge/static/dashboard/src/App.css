@@ -284,3 +284,50 @@ body {
   border-color: var(--gray-500);
   color: white;
 }
+
+/* Sync Button & Status */
+.btn-sync {
+  background: linear-gradient(135deg, #6B8DD6, #8E6DD6);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-sync:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(107, 141, 214, 0.4);
+}
+.btn-sync:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.btn-sync.syncing {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.sync-status {
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sync-status.success {
+  background: #E3FCEF;
+  color: #006644;
+  border: 1px solid #ABF5D1;
+}
+.sync-status.error {
+  background: #FFEBE6;
+  color: #BF2600;
+  border: 1px solid #FFBDAD;
+}

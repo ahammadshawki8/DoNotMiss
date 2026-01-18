@@ -9,7 +9,7 @@
     "storage"
   ],
   "host_permissions": [
-    "https://donotmiss-backend.onrender.com/*"
+    "http://localhost:5000/*"
   ],
   "background": {
     "service_worker": "background.js"
