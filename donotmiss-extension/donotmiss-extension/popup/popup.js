@@ -1,11 +1,7 @@
 // Popup script - handles the extension popup UI with AI-detected tasks
 
 // Flask backend endpoint (same as background.js)
-const BACKEND_URL = 'https://donotmiss-backend.onrender.com/api';
-
-// Wake-up configuration
-const WAKEUP_CHECK_INTERVAL = 3000; // 3 seconds
-const WAKEUP_TIMEOUT = 10000; // 10 seconds per request timeout
+const BACKEND_URL = 'http://localhost:5000/api';
 
 // Mock AI-detected tasks for demo (used as fallback)
 const MOCK_TASKS = [
@@ -32,88 +28,7 @@ const MOCK_TASKS = [
   }
 ];
 
-// Check if backend is awake
-async function checkBackendHealth() {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), WAKEUP_TIMEOUT);
-  
-  try {
-    const response = await fetch(`${BACKEND_URL}/health`, {
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch (e) {
-    clearTimeout(timeoutId);
-    return false;
-  }
-}
-
-// Wake up the backend with retry logic
-async function wakeUpBackend() {
-  const wakeupScreen = document.getElementById('wakeup-screen');
-  const mainContent = document.getElementById('main-content');
-  const attemptText = document.getElementById('wakeup-attempt');
-  
-  let attempt = 0;
-  
-  // First quick check - maybe backend is already awake
-  const isAwake = await checkBackendHealth();
-  if (isAwake) {
-    return true;
-  }
-  
-  // Backend is sleeping, show wake-up screen
-  wakeupScreen.style.display = 'flex';
-  mainContent.style.display = 'none';
-  
-  // Keep trying until backend wakes up
-  return new Promise((resolve) => {
-    const checkInterval = setInterval(async () => {
-      attempt++;
-      attemptText.textContent = `Attempt ${attempt} • Checking every 3 seconds...`;
-      
-      const awake = await checkBackendHealth();
-      if (awake) {
-        clearInterval(checkInterval);
-        wakeupScreen.style.display = 'none';
-        mainContent.style.display = 'block';
-        updateStatus(true);
-        resolve(true);
-      }
-    }, WAKEUP_CHECK_INTERVAL);
-    
-    // Also do immediate check
-    checkBackendHealth().then(awake => {
-      if (awake) {
-        clearInterval(checkInterval);
-        wakeupScreen.style.display = 'none';
-        mainContent.style.display = 'block';
-        updateStatus(true);
-        resolve(true);
-      }
-    });
-  });
-}
-
-// Update connection status in footer
-function updateStatus(connected) {
-  const statusDot = document.getElementById('status-dot');
-  const statusText = document.getElementById('status-text');
-  
-  if (connected) {
-    statusDot.classList.remove('disconnected');
-    statusText.textContent = 'Ready to sync with Jira';
-  } else {
-    statusDot.classList.add('disconnected');
-    statusText.textContent = 'Backend offline';
-  }
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
-  // First wake up the backend if needed
-  await wakeUpBackend();
-  // Then load tasks
   await loadTasks();
 });
 

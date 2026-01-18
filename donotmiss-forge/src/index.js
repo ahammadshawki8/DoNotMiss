@@ -1,8 +1,11 @@
 import Resolver from '@forge/resolver';
-import { storage, route } from '@forge/api';
+import { storage, route, fetch } from '@forge/api';
 import api from '@forge/api';
 
 const resolver = new Resolver();
+
+// Flask backend URL - change to your deployed URL or ngrok tunnel for production
+const FLASK_BACKEND_URL = process.env.FLASK_BACKEND_URL || 'https://donotmiss-backend.onrender.com';
 
 // Priority mapping
 const PRIORITY_MAP = {
@@ -339,6 +342,118 @@ resolver.define('initMockData', async () => {
   
   await storage.set('tasks', mockTasks);
   return { success: true, message: 'Mock data initialized' };
+});
+
+// ============================================================
+// Flask Backend Integration
+// ============================================================
+
+// Get/set the Flask backend URL (for configuration)
+resolver.define('getBackendUrl', async () => {
+  const url = await storage.get('flaskBackendUrl') || FLASK_BACKEND_URL;
+  return { url };
+});
+
+resolver.define('setBackendUrl', async ({ payload }) => {
+  await storage.set('flaskBackendUrl', payload.url);
+  return { success: true };
+});
+
+// Fetch tasks from Flask backend
+resolver.define('fetchFromBackend', async () => {
+  const backendUrl = await storage.get('flaskBackendUrl') || FLASK_BACKEND_URL;
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/tasks?status=pending`);
+    if (!response.ok) {
+      return { success: false, error: `Backend returned ${response.status}` };
+    }
+    const backendTasks = await response.json();
+    return { success: true, tasks: backendTasks };
+  } catch (error) {
+    console.error('Failed to fetch from Flask backend:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Sync tasks from Flask backend into Forge storage
+resolver.define('syncFromBackend', async () => {
+  const backendUrl = await storage.get('flaskBackendUrl') || FLASK_BACKEND_URL;
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/tasks?status=pending`);
+    if (!response.ok) {
+      return { success: false, error: `Backend returned ${response.status}` };
+    }
+    
+    const backendTasks = await response.json();
+    const existingTasks = await storage.get('tasks') || [];
+    
+    // Get IDs of tasks already in Forge
+    const existingIds = new Set(existingTasks.map(t => t.id));
+    
+    // Add new tasks from backend that don't exist in Forge
+    let addedCount = 0;
+    for (const bt of backendTasks) {
+      if (!existingIds.has(bt.id)) {
+        existingTasks.unshift({
+          id: bt.id,
+          title: bt.title || bt.text?.substring(0, 80) || 'Untitled',
+          description: bt.description || bt.text || '',
+          source: bt.source || 'web',
+          url: bt.url || '',
+          priority: bt.priority || 'medium',
+          deadline: bt.metadata?.deadline || null,
+          status: 'pending',
+          createdAt: bt.createdAt || new Date().toISOString(),
+          createdVia: 'donotmiss-flask'
+        });
+        addedCount++;
+      }
+    }
+    
+    await storage.set('tasks', existingTasks);
+    
+    return { success: true, added: addedCount, total: existingTasks.length };
+  } catch (error) {
+    console.error('Failed to sync from Flask backend:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Mark task as sent on Flask backend after Jira creation
+resolver.define('markSentOnBackend', async ({ payload }) => {
+  const backendUrl = await storage.get('flaskBackendUrl') || FLASK_BACKEND_URL;
+  const { taskId } = payload;
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/tasks/${taskId}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    return { success: response.ok };
+  } catch (error) {
+    console.error('Failed to mark sent on backend:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Delete task from Flask backend
+resolver.define('deleteFromBackend', async ({ payload }) => {
+  const backendUrl = await storage.get('flaskBackendUrl') || FLASK_BACKEND_URL;
+  const { taskId } = payload;
+  
+  try {
+    const response = await fetch(`${backendUrl}/api/tasks/${taskId}`, {
+      method: 'DELETE'
+    });
+    
+    return { success: response.ok || response.status === 404 };
+  } catch (error) {
+    console.error('Failed to delete from backend:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 export const handler = resolver.getDefinitions();
