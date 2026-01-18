@@ -306,6 +306,17 @@ resolver.define('clearTasks', async () => {
   return { success: true };
 });
 
+// Initialize mock data (for demo purposes - does nothing if tasks already exist)
+resolver.define('initMockData', async () => {
+  const existingTasks = await storage.get('tasks');
+  // If tasks already exist, don't overwrite them
+  if (existingTasks && existingTasks.length > 0) {
+    return { success: true, message: 'Tasks already exist', count: existingTasks.length };
+  }
+  // Return success - no mock data added by default
+  return { success: true, message: 'No initialization needed', count: 0 };
+});
+
 
 
 // ============================================================
