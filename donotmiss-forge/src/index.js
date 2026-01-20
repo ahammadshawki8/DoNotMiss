@@ -5,7 +5,7 @@ import api from '@forge/api';
 const resolver = new Resolver();
 
 // Flask backend URL - tasks are stored in PostgreSQL via this backend
-const FLASK_BACKEND_URL = process.env.FLASK_BACKEND_URL || 'https://donotmiss-backend.onrender.com';
+const FLASK_BACKEND_URL = process.env.FLASK_BACKEND_URL || 'https://donotmiss.onrender.com';
 
 // Priority mapping for Jira
 const PRIORITY_MAP = {

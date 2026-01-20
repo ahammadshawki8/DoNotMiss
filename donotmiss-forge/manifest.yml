@@ -26,5 +26,5 @@ permissions:
       backend:
         - '*.ngrok.io'
         - '*.ngrok-free.app'
-        - 'donotmiss-backend.onrender.com'
+        - 'donotmiss.onrender.com'
         - '*.onrender.com'
