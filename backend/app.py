@@ -278,7 +278,8 @@ Format: [{{"title": "...", "description": "...", "priority": "medium", "deadline
             deadline = None
             if task_data.get('deadline'):
                 try:
-                    deadline = datetime.fromisoformat(task_data['deadline']).date()
+                    from datetime import datetime as dt
+                    deadline = dt.fromisoformat(task_data['deadline']).date()
                 except:
                     deadline = None
             
@@ -300,7 +301,8 @@ Format: [{{"title": "...", "description": "...", "priority": "medium", "deadline
             db.session.add(task)
             created_tasks.append(task)
         
-        db.session.commit()
+        if created_tasks:
+            db.session.commit()
         
         return jsonify({
             'tasks': [task.to_dict() for task in created_tasks],
