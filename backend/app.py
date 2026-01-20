@@ -40,7 +40,7 @@ class Task(db.Model):
     jira_url = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    metadata = db.Column(db.JSON, default={})
+    task_metadata = db.Column(db.JSON, default={})
     
     def to_dict(self):
         return {
@@ -56,7 +56,7 @@ class Task(db.Model):
             'jiraUrl': self.jira_url,
             'createdAt': self.created_at.isoformat(),
             'updatedAt': self.updated_at.isoformat(),
-            'metadata': self.metadata or {}
+            'metadata': self.task_metadata or {}
         }
 
 # Health check
@@ -110,7 +110,7 @@ def create_task():
             priority=data.get('priority', 'medium'),
             deadline=deadline,
             status='pending',
-            metadata=data.get('metadata', {})
+            task_metadata=data.get('metadata', {})
         )
         
         db.session.add(task)
