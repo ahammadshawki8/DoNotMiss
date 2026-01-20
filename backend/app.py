@@ -54,8 +54,8 @@ class Task(db.Model):
             'status': self.status,
             'jiraKey': self.jira_key,
             'jiraUrl': self.jira_url,
-            'createdAt': self.created_at.isoformat(),
-            'updatedAt': self.updated_at.isoformat(),
+            'createdAt': self.created_at.isoformat() if self.created_at else datetime.utcnow().isoformat(),
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else datetime.utcnow().isoformat(),
             'metadata': self.task_metadata or {}
         }
 
