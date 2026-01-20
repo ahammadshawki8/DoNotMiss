@@ -220,18 +220,6 @@ def analyze_tasks():
             except Exception as e:
                 print(f"Groq initialization error: {e}")
                 tasks = detect_tasks_simple(text)
-                return jsonify({
-                    'tasks': [task.to_dict() for task in [Task(
-                        title=t['title'],
-                        description=t['description'],
-                        source=source,
-                        url=url,
-                        priority=t['priority'],
-                        status='detected',
-                        task_metadata={'aiDetected': False, 'detectedAt': datetime.utcnow().isoformat(), **metadata}
-                    ) for t in tasks]],
-                    'count': len(tasks)
-                })
             
             try:
                 prompt = f"""
