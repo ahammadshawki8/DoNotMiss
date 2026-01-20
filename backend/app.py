@@ -214,10 +214,27 @@ def analyze_tasks():
             tasks = detect_tasks_simple(text)
         else:
             # Use Groq AI
-            from groq import Groq
-            client = Groq(api_key=groq_api_key)
+            try:
+                from groq import Groq
+                client = Groq(api_key=groq_api_key)
+            except Exception as e:
+                print(f"Groq initialization error: {e}")
+                tasks = detect_tasks_simple(text)
+                return jsonify({
+                    'tasks': [task.to_dict() for task in [Task(
+                        title=t['title'],
+                        description=t['description'],
+                        source=source,
+                        url=url,
+                        priority=t['priority'],
+                        status='detected',
+                        task_metadata={'aiDetected': False, 'detectedAt': datetime.utcnow().isoformat(), **metadata}
+                    ) for t in tasks]],
+                    'count': len(tasks)
+                })
             
-            prompt = f"""
+            try:
+                prompt = f"""
 Analyze this text and extract any action items or tasks.
 For each task found, provide:
 1. A clear task title (max 50 chars)
@@ -231,24 +248,28 @@ Text:
 Return ONLY a JSON array of tasks. If no tasks found, return empty array [].
 Format: [{{"title": "...", "description": "...", "priority": "medium", "deadline": "2026-01-25"}}]
 """
-            
-            response = client.chat.completions.create(
+                
+                response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a task detection assistant. Extract actionable tasks. Return only valid JSON."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
-                max_tokens=500
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            # Parse JSON
-            import json
-            tasks = json.loads(result)
-            if not isinstance(tasks, list):
-                tasks = []
+                    temperature=0.3,
+                    max_tokens=500
+                )
+                
+                result = response.choices[0].message.content.strip()
+                
+                # Parse JSON
+                import json
+                tasks = json.loads(result)
+                if not isinstance(tasks, list):
+                    tasks = []
+            except Exception as e:
+                print(f"Groq API error: {e}")
+                # Fallback to simple detection
+                tasks = detect_tasks_simple(text)
         
         # Create detected tasks in database
         created_tasks = []
