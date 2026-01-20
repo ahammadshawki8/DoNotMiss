@@ -63,14 +63,29 @@ No context switching. No copy-paste. No forgotten tasks.
 └─────────────────────────────────────────┼───────────────────┘
                                           │
                                           ▼
+                    ┌─────────────────────────────────┐
+                    │   Flask Backend (Render)        │
+                    │   • RESTful API                 │
+                    │   • Task Storage                │
+                    │   • CORS Enabled                │
+                    └──────────┬──────────────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │  PostgreSQL (Render)│
+                    │  • Tasks Table      │
+                    │  • Metadata         │
+                    └──────────┬──────────┘
+                               │
+                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     ATLASSIAN JIRA                          │
 │  ┌─────────────────────────────────────────────────────────┐│
 │  │              Forge App (DoNotMiss Dashboard)            ││
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌───────────┐  ││
-│  │  │  Inbox  │  │  Sent   │  │ Declined│  │  Storage  │  ││
-│  │  │(Pending)│  │(In Jira)│  │ (Trash) │  │(Forge API)│  ││
-│  │  └────┬────┘  └────┬────┘  └─────────┘  └───────────┘  ││
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐                 ││
+│  │  │  Inbox  │  │  Sent   │  │ Declined│                 ││
+│  │  │(Pending)│  │(In Jira)│  │ (Trash) │                 ││
+│  │  └────┬────┘  └────┬────┘  └─────────┘                 ││
 │  │       │            │                                    ││
 │  │       ▼            ▼                                    ││
 │  │  ┌─────────────────────────────────────────────────┐   ││
@@ -86,52 +101,75 @@ No context switching. No copy-paste. No forgotten tasks.
 ## 🚀 Getting Started
 
 ### Prerequisites
+- Python 3.11+
 - Node.js 20+
 - Atlassian Forge CLI (`npm install -g @forge/cli`)
 - Chrome browser
 - Jira Cloud instance
+- Render account (free tier works)
+- GitHub account
 
-### 1. Clone the Repository
+### Quick Start (15 minutes)
+
+**See [QUICKSTART.md](QUICKSTART.md) for the fastest way to get started!**
+
+Or follow the detailed guide in [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+
+### Verification
+
+Before deploying, run the configuration checker:
 ```bash
-git clone https://github.com/your-username/donotmiss.git
-cd donotmiss
+python verify-config.py
 ```
 
-### 2. Install the Chrome Extension
+This will verify all files are properly configured.
+
+### 1. Deploy Backend to Render
+
 ```bash
-# Navigate to chrome://extensions/
-# Enable "Developer mode"
-# Click "Load unpacked"
-# Select the donotmiss-extension folder
+# Push code to GitHub
+git push origin main
+
+# Go to Render Dashboard → New Blueprint
+# Connect repository → Render auto-deploys from render.yaml
+# Get your backend URL: https://donotmiss-backend-xxxx.onrender.com
 ```
 
-### 3. Deploy the Forge App
+### 2. Install Chrome Extension
+
+```bash
+# Update backend URL in donotmiss-extension/background.js
+# Then load extension:
+# 1. Go to chrome://extensions/
+# 2. Enable "Developer mode"
+# 3. Click "Load unpacked"
+# 4. Select donotmiss-extension folder
+```
+
+### 3. Deploy Forge App
+
 ```bash
 cd donotmiss-forge
 
-# Install dependencies
-npm install
+# Update backend URL in src/index.js and manifest.yml
+
+# Build React dashboard
 cd static/dashboard && npm install && npm run build && cd ../..
 
-# Login to Forge
+# Deploy to Forge
 forge login
-
-# Register the app (first time only)
 forge register
-
-# Deploy
 forge deploy
-
-# Install to your Jira site
 forge install
 ```
 
-### 4. Test the Flow
-1. Go to any webpage and select some text
-2. Right-click → "Add to DoNotMiss"
-3. Fill in the details and click "Add to Jira"
-4. Open Jira → Your Project → DoNotMiss (in sidebar)
-5. Click "Send to Jira" to create the issue
+### 4. Test End-to-End
+
+1. Select text on any webpage → Right-click → "Add to DoNotMiss"
+2. Fill form → Click "Add to Jira"
+3. Open Jira → Your Project → DoNotMiss
+4. See task in Inbox → Click "Send to Jira"
+5. Task creates real Jira issue!
 
 ---
 
@@ -140,16 +178,26 @@ forge install
 ```
 donotmiss/
 ├── README.md
+├── DEPLOYMENT.md                 # Complete deployment guide
+├── render.yaml                   # Render deployment config
+│
+├── backend/                      # Flask + PostgreSQL Backend
+│   ├── app.py                    # Main Flask application
+│   ├── requirements.txt          # Python dependencies
+│   ├── Procfile                  # Render start command
+│   ├── runtime.txt               # Python version
+│   ├── .env.example              # Environment variables template
+│   └── README.md                 # Backend documentation
+│
 ├── donotmiss-extension/          # Chrome Extension (Manifest V3)
 │   ├── manifest.json
-│   ├── background.js             # Service worker, context menu
+│   ├── background.js             # Service worker, API calls
 │   ├── content.js                # Capture modal injection
 │   ├── content.css               # Modal styles
-│   ├── icons/                    # Extension icons (PNG)
+│   ├── icons/                    # Extension icons
 │   └── popup/                    # Extension popup UI
 │       ├── popup.html
 │       ├── popup.js
-│       ├── popup.css
 │       ├── capture.html          # Fallback capture window
 │       └── capture.js
 │
@@ -157,7 +205,7 @@ donotmiss/
     ├── manifest.yml              # Forge configuration
     ├── package.json
     ├── src/
-    │   └── index.js              # Resolver functions (backend)
+    │   └── index.js              # Resolver functions (API client)
     └── static/
         └── dashboard/            # React dashboard UI
             ├── src/
@@ -205,10 +253,12 @@ Full description with source link, labels, and system comment
 
 ## 🛠️ Tech Stack
 
+- **Backend**: Flask 3.0, PostgreSQL, SQLAlchemy
+- **Hosting**: Render (free tier)
 - **Chrome Extension**: Manifest V3, Vanilla JS
 - **Forge App**: Node.js 20, React 18
 - **Jira Integration**: REST API v3, Atlassian Document Format (ADF)
-- **Storage**: Forge Storage API
+- **Database**: PostgreSQL with JSON support
 
 ---
 

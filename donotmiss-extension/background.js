@@ -93,8 +93,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Flask backend endpoint (change for production)
-const BACKEND_URL = 'https://donotmiss-backend.onrender.com/api';
+// Flask backend endpoint - update this after deploying to Render
+const BACKEND_URL = 'https://donotmiss-backend.onrender.com';
 
 // Submit task to Flask backend for storage
 // The Jira Forge app will sync from the backend and create Jira issues
@@ -118,7 +118,7 @@ async function submitTaskToBackend(task) {
   };
 
   // Store task in backend - Jira Forge app will sync and create issues
-  const response = await fetch(`${BACKEND_URL}/tasks`, {
+  const response = await fetch(`${BACKEND_URL}/api/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
