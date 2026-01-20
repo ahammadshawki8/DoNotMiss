@@ -184,6 +184,37 @@ def confirm_task(task_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# Update task
+@app.route('/api/tasks/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    try:
+        task = Task.query.get_or_404(task_id)
+        data = request.json
+        
+        # Update fields if provided
+        if 'title' in data:
+            task.title = data['title'][:500]
+        if 'description' in data:
+            task.description = data['description']
+        if 'priority' in data:
+            task.priority = data['priority']
+        if 'deadline' in data:
+            if data['deadline']:
+                try:
+                    task.deadline = datetime.fromisoformat(data['deadline'].replace('Z', '+00:00')).date()
+                except:
+                    pass
+            else:
+                task.deadline = None
+        
+        task.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        return jsonify(task.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 # Get detected tasks (for extension popup)
 @app.route('/api/tasks/detected', methods=['GET'])
 def get_detected_tasks():
@@ -223,31 +254,54 @@ def analyze_tasks():
             
             try:
                 prompt = f"""
-Analyze this text and extract any action items or tasks.
-For each task found, provide:
-1. A clear task title (max 50 chars)
-2. A brief description
-3. Priority (low/medium/high/highest)
-4. Estimated deadline if mentioned (format: YYYY-MM-DD)
+You are a task extraction assistant. Analyze the following email/message and extract actionable tasks.
 
-Text:
+For each task found:
+1. Write a CLEAR, ACTIONABLE title (30-60 chars) - Start with a verb (e.g., "Review budget report", "Schedule meeting with team")
+2. Write a DETAILED description (2-3 sentences) that includes:
+   - What needs to be done
+   - Why it's important (if mentioned)
+   - Any relevant context or details
+3. Assign priority based on urgency indicators:
+   - "highest" = ASAP, urgent, critical, immediately
+   - "high" = important, soon, this week
+   - "medium" = normal priority, no urgency mentioned
+   - "low" = FYI, optional, when you have time
+4. Extract deadline if mentioned (format: YYYY-MM-DD)
+
+Text to analyze:
 {text[:2000]}
 
-Return ONLY a JSON array of tasks. If no tasks found, return empty array [].
-Format: [{{"title": "...", "description": "...", "priority": "medium", "deadline": "2026-01-25"}}]
+Return ONLY a valid JSON array. If no tasks found, return [].
+Format:
+[
+  {{
+    "title": "Review Q4 budget report",
+    "description": "Review the Q4 budget report sent by finance team. Focus on marketing expenses and provide feedback by end of week. This is needed for the board meeting.",
+    "priority": "high",
+    "deadline": "2026-01-24"
+  }}
+]
 """
                 
                 response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": "You are a task detection assistant. Extract actionable tasks. Return only valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": "You are an expert task extraction assistant. Extract clear, actionable tasks with detailed descriptions. Return only valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
                     temperature=0.3,
-                    max_tokens=500
+                    max_tokens=1000
                 )
                 
                 result = response.choices[0].message.content.strip()
+                
+                # Clean up response (remove markdown code blocks if present)
+                if result.startswith('```'):
+                    result = result.split('```')[1]
+                    if result.startswith('json'):
+                        result = result[4:]
+                result = result.strip()
                 
                 # Parse JSON
                 import json
@@ -309,34 +363,60 @@ def detect_tasks_simple(text):
     
     # Keywords that indicate tasks
     patterns = [
-        r'please\s+(\w+\s+\w+)',
-        r'can you\s+(\w+\s+\w+)',
-        r'need to\s+(\w+\s+\w+)',
-        r'should\s+(\w+\s+\w+)',
-        r'must\s+(\w+\s+\w+)',
-        r'action item[s]?:?\s*(.+)',
-        r'todo[s]?:?\s*(.+)',
-        r'task[s]?:?\s*(.+)',
+        (r'please\s+([^.!?\n]{10,100})', 'high'),
+        (r'can you\s+([^.!?\n]{10,100})', 'medium'),
+        (r'need to\s+([^.!?\n]{10,100})', 'high'),
+        (r'should\s+([^.!?\n]{10,100})', 'medium'),
+        (r'must\s+([^.!?\n]{10,100})', 'highest'),
+        (r'action item[s]?:?\s*([^.!?\n]{10,100})', 'high'),
+        (r'todo[s]?:?\s*([^.!?\n]{10,100})', 'medium'),
+        (r'task[s]?:?\s*([^.!?\n]{10,100})', 'medium'),
+        (r'reminder:?\s*([^.!?\n]{10,100})', 'medium'),
+        (r'don\'t forget to\s+([^.!?\n]{10,100})', 'high'),
     ]
     
-    for pattern in patterns:
+    seen_tasks = set()
+    
+    for pattern, priority in patterns:
         matches = re.finditer(pattern, text, re.IGNORECASE)
         for match in matches:
-            # Extract context
-            start = max(0, match.start() - 50)
-            end = min(len(text), match.end() + 100)
+            # Extract the action phrase
+            action = match.group(1).strip()
+            
+            # Skip if too short or already seen
+            if len(action) < 10 or action.lower() in seen_tasks:
+                continue
+            
+            seen_tasks.add(action.lower())
+            
+            # Extract more context around the match
+            start = max(0, match.start() - 100)
+            end = min(len(text), match.end() + 150)
             context = text[start:end].strip()
             
+            # Clean up title (capitalize first letter, remove extra spaces)
+            title = action[:60].strip()
+            if not title[0].isupper():
+                title = title[0].upper() + title[1:]
+            
+            # Create description from context
+            description = context[:300].strip()
+            if len(context) > 300:
+                description += '...'
+            
             task = {
-                'title': context[:50] + '...' if len(context) > 50 else context,
-                'description': context,
-                'priority': 'medium',
+                'title': title,
+                'description': description,
+                'priority': priority,
                 'deadline': None
             }
             tasks.append(task)
             
-            if len(tasks) >= 3:
+            if len(tasks) >= 5:
                 break
+        
+        if len(tasks) >= 5:
+            break
     
     return tasks
 
