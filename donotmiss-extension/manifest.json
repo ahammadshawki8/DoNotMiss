@@ -6,10 +6,11 @@
   "permissions": [
     "contextMenus",
     "activeTab",
-    "storage"
+    "storage",
+    "notifications"
   ],
   "host_permissions": [
-    "https://donotmiss-backend.onrender.com/*"
+    "https://donotmiss.onrender.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -32,6 +33,19 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "css": ["content.css"]
+    },
+    {
+      "matches": [
+        "*://mail.google.com/*",
+        "*://*.outlook.com/*",
+        "*://*.outlook.live.com/*",
+        "*://outlook.office.com/*",
+        "*://*.slack.com/*",
+        "*://teams.microsoft.com/*",
+        "*://web.telegram.org/*"
+      ],
+      "js": ["page-scanner.js"],
+      "run_at": "document_idle"
     }
   ]
 }

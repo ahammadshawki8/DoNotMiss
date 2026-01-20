@@ -32,18 +32,37 @@
 
     <!-- Main content -->
     <main class="content">
-      <!-- Empty state - coming soon message -->
-      <div class="empty-state">
+      <!-- Loading state -->
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading detected tasks...</p>
+      </div>
+
+      <!-- Detected tasks list -->
+      <div class="tasks-container" id="tasksContainer" style="display: none;">
+        <div class="tasks-header">
+          <h2>🤖 AI-Detected Tasks</h2>
+          <button class="btn-refresh" id="refreshBtn" title="Refresh">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="tasks-list" id="tasksList"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState" style="display: none;">
         <div class="empty-icon">
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
             <circle cx="24" cy="24" r="20" stroke="#DFE1E6" stroke-width="2"/>
             <path d="M18 24h12M24 18v12" stroke="#DFE1E6" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </div>
-        <h2>AI Task Detection</h2>
-        <p>Coming soon! This panel will show automatically detected tasks from your browsing.</p>
+        <h2>No Detected Tasks</h2>
+        <p>AI hasn't detected any tasks yet.</p>
         <div class="hint">
-          <strong>For now:</strong> Select text on any page, right-click, and choose "Add to DoNotMiss" to capture tasks.
+          <strong>Tip:</strong> Select text on any page, right-click, and choose "Add to DoNotMiss" to manually capture tasks.
         </div>
       </div>
     </main>

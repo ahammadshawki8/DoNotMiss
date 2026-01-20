@@ -91,10 +91,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep channel open for async response
   }
+  
+  if (request.action === 'analyzeForTasks') {
+    analyzeContentForTasks(request.content)
+      .then(result => sendResponse(result))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true; // Keep channel open for async response
+  }
+  
+  if (request.action === 'updateBadge') {
+    updateBadgeCount();
+    sendResponse({ success: true });
+    return true;
+  }
+  
+  if (request.action === 'openPopup') {
+    chrome.action.openPopup();
+    sendResponse({ success: true });
+    return true;
+  }
 });
 
 // Flask backend endpoint - update this after deploying to Render
-const BACKEND_URL = 'https://donotmiss-backend.onrender.com';
+const BACKEND_URL = 'https://donotmiss.onrender.com';
 
 // Submit task to Flask backend for storage
 // The Jira Forge app will sync from the backend and create Jira issues
@@ -139,3 +158,69 @@ async function submitTaskToBackend(task) {
     message: 'Task saved! Open Jira to sync and create issue.'
   };
 }
+
+// Analyze content for tasks using backend AI
+async function analyzeContentForTasks(content) {
+  console.log('🤖 Analyzing content for tasks...');
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/analyze-tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: content.fullText,
+        source: content.platform,
+        url: content.url,
+        metadata: {
+          subject: content.subject,
+          sender: content.sender
+        }
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || `Backend error: ${response.status}`);
+    }
+
+    console.log(`✅ Analysis complete: ${result.tasks?.length || 0} tasks found`);
+
+    return {
+      success: true,
+      tasks: result.tasks || [],
+      count: result.tasks?.length || 0
+    };
+  } catch (error) {
+    console.error('❌ Analysis error:', error);
+    return {
+      success: false,
+      error: error.message,
+      tasks: []
+    };
+  }
+}
+
+// Update badge count with detected tasks
+async function updateBadgeCount() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tasks/detected`);
+    if (response.ok) {
+      const tasks = await response.json();
+      const count = tasks.length;
+      
+      if (count > 0) {
+        chrome.action.setBadgeText({ text: count.toString() });
+        chrome.action.setBadgeBackgroundColor({ color: '#FF5630' });
+      } else {
+        chrome.action.setBadgeText({ text: '' });
+      }
+    }
+  } catch (error) {
+    console.error('Error updating badge:', error);
+  }
+}
+
+// Update badge on startup and periodically
+updateBadgeCount();
+setInterval(updateBadgeCount, 30000); // Every 30 seconds
